@@ -1,5 +1,5 @@
 # What is Vatsim Py-API?
-Vatsim Py-API is a Python library to interact with data from Vatsim's datafeed, currently located at: http://data.vatsim.net/. It implements Python objects to access the underlying Vatsim data in a Pythonic way, and also parses certain data into developer friendly formats (e.g., timestamp strings into Python datetime objects). 
+Vatsim Py-API is a Python library to interact with data from Vatsim's live datafeed, currently located at: http://data.vatsim.net/. It implements Python objects to access the underlying Vatsim data in a Pythonic way, and also parses certain data into developer friendly formats (e.g., timestamp strings into Python datetime objects). 
 
 Because Vatsim's datafeed is updated every ~15 seconds, Py-API supports configurable caching of data from the datafeed so that each access method does not fetch the datafeed (although a "force update" override exists if needed).
 
@@ -20,14 +20,14 @@ TBD
 ## Create API object
 Use default caching periods (60 seconds for METARs and 15 seconds for network data)
 ```python
-vatsim = VatsimAPI()
+vatsim = VatsimLiveAPI()
 ```
 
 ## Create API object with different cache TTLs
 Configurable with the `DATA_TTL` and `METAR_TTL` arguments, which speciy how long network data and METAR data should be cached (in seconds), respectively
 ```python
 # 1 min network data cache and 5 min METAR cache
-vatsim = VatsimAPI(DATA_TTL=60, METAR_TTL=300)
+vatsim = VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
 ```
 
 ## Retrieve all pilots or controllers and iterate through them
