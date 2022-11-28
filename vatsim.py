@@ -451,7 +451,7 @@ class VatsimLiveAPI():
                 return any([re.search(i, getattr(v, 'callsign')) for i in VatsimLiveAPI.wrap_if_single(callsigns)])
             return self._return_filtered(cache_key, filter, update_mode)
         else:
-            self._return_whole(cache_key, update_mode)
+            return self._return_whole(cache_key, update_mode)
     
     def _return_single_exact_match(self, cache_key, val_key, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
@@ -497,16 +497,16 @@ api = VatsimLiveAPI()
 #n = api.metar('KSFO')
 #print(k)
 #api._fetch_conn_data()
-print(api.facility(5))
-print(api.facility(21))
-print(api.server('USA-WEST'))
-print(api.atis('EDDS_ATIS'))
-x = api.atises(callsigns=['KMCO', 'KIAD'])
-print(x)
+#print(api.facility(5))
+#print(api.facility(21))
+#print(api.server('USA-WEST'))
+#print(api.atis('EDDS_ATIS'))
+#x = api.atises(callsigns=['KMCO', 'KIAD'])
+#print(x)
 pp = pprint.PrettyPrinter(indent = 1)
 #pp.pprint(api.pilots(callsigns='WAT'))
-pp.pprint(api.pilot(callsign='WAT2992'))
-pp.pprint(api.controller(callsign='IND_CTR'))
+#pp.pprint(api.pilot(callsign='WAT2992'))
+#pp.pprint(api.controller(callsign='IND_CTR'))
 
 #print(api._parse_pilot(x))
 
@@ -516,3 +516,11 @@ pp.pprint(api.controller(callsign='IND_CTR'))
 # y = Flightplan(**x)
 # print(y)
 # print(y.remarks)
+
+
+p = api.pilots()
+for cid, pilot in p.items():
+    if pilot.flight_plan is not None:
+        print('%s departed from %s and is going to %s at current altitude %i' % (pilot.callsign, pilot.flight_plan.departure, pilot.flight_plan.arrival, pilot.altitude))
+    else:
+        print('%s is at current altitude %i with no flight plan' % (pilot.callsign, pilot.altitude))
