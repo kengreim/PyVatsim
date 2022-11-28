@@ -5,6 +5,12 @@ from urllib.parse import urlencode
 import re
 from dataclasses import dataclass
 import pprint
+from enum import Enum
+
+class UpdateMode(Enum):
+    NOUPDATE = 0
+    NORMAL = 1
+    FORCE = 2
 
 @dataclass
 class Flightplan:
@@ -76,6 +82,11 @@ class Server:
     client_connections_allowed: bool
     is_sweatbox: bool
 
+    @classmethod
+    def from_api_json(cls, json_dict, api):
+        args = json_dict
+        args['clients_connection_allowed'] = bool(args['clients_connection_allowed'])
+        return cls(**args)
 
 @dataclass
 class Pilot:
@@ -100,6 +111,8 @@ class Pilot:
     def from_api_json(cls, json_dict, api):
         args = json_dict
         # TODO: Pilot Rating lookup
+        args['pilot_rating'] = api.pilot_rating(args['pilot_rating'])
+        args['server'] = api.server(args['server'])
         args['flight_plan'] = Flightplan.from_api_json(args['flight_plan'], api)
         args['logon_time'] = VatsimLiveAPI.parse_timestampstr(args['logon_time'])
         args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
@@ -107,7 +120,6 @@ class Pilot:
         # add a field for time online? Maybe as post_init on class itself
 
         return cls(**args)
-
 
 @dataclass
 class NameTable:
@@ -124,9 +136,11 @@ class NameTable:
 class Rating(NameTable):
     pass
 
+
 @dataclass
 class Facility(NameTable):
     pass
+
 
 @dataclass
 class PilotRating(NameTable):
@@ -190,7 +204,9 @@ class Controller:
             args['text_atis'] = '\n'.join(args['text_atis'])
         args['logon_time'] = VatsimLiveAPI.parse_timestampstr(args['logon_time'])
         args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
-        # TODO -- facility and rating and server join
+        args['facility'] = api.facility(args['facility'])
+        args['rating'] = api.controller_rating(args['rating'])
+        args['server'] = api.server(args['server'])
         return cls(**args)
 
 
@@ -205,7 +221,9 @@ class ATIS(Controller):
             args['text_atis'] = ' '.join(args['text_atis'])
         args['logon_time'] = VatsimLiveAPI.parse_timestampstr(args['logon_time'])
         args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
-        # TODO -- facility and rating and server join
+        args['facility'] = api.facility(args['facility'])
+        args['rating'] = api.controller_rating(args['rating'])
+        args['server'] = api.server(args['server'])
         return cls(**args)
 
 
@@ -223,8 +241,11 @@ class TTLCache():
             return self._cache[key] == None or (now - self._last_update_time[key]).total_seconds() > self.ttl
     
     def get_cached(self, key='_ALL'):
-        return self._cache[key] # should probably add logic checks for stale data here, maybe throw error if attempting to get cached data older than TTL
-    
+        if key in self._cache:
+            return self._cache[key] # should probably add logic checks for stale data here, maybe throw error if attempting to get cached data older than TTL
+        else:
+            return None
+
     def cache(self, val, key='_ALL'):
         self._cache[key] = val
         self._last_update_time[key] = datetime.now(timezone.utc)
@@ -259,7 +280,7 @@ class VatsimLiveAPI():
             self.vatsim_endpoints = vatsim_endpoints
 
         self._metar_cache = TTLCache(METAR_TTL)
-        self._data_cache  = TTLCache(DATA_TTL)
+        self._conndata_cache  = TTLCache(DATA_TTL)
 
     def _fetch_metars(self, fields):
         if isinstance(fields, str):
@@ -287,31 +308,26 @@ class VatsimLiveAPI():
             
         json = r.json()
 
+        # Have to fetch the lookup tables first so that we can join objects properly
         fetch_configs = {
             'facilities'    : (Facility, 'from_api_json', 'id'),
             'ratings'       : (Rating, 'from_api_json', 'id'),
             'pilot_ratings' : (PilotRating, 'from_api_json', 'id'),
+            'servers'       : (Server, 'from_api_json', 'ident'),
             'pilots'        : (Pilot, 'from_api_json', 'cid'),
             'controllers'   : (Controller, 'from_api_json', 'cid'),
-            'atis'          : (ATIS, 'from_api_json', 'callsign')  
+            'atis'          : (ATIS, 'from_api_json', 'callsign') 
+            # TODO -- fetch prefiles
         }
 
-        result = {}
+        self._conndata_cache.cache(json) # Cache raw result with '_ALL' special key
+
         for name, (obj, constructor, key) in fetch_configs.items():
-            result[name] = {}
+            result = {}
             for i in json[name]:
                 j = getattr(obj, constructor)(i, self)
-                result[name][getattr(j, key)] = j
-
-        pp = pprint.PrettyPrinter()
-        #pp.pprint(result)
-        
-        # # TODO -- fetch and handle prefiles, facility levels, controller ratings, pilot ratings
-
-        # print(len(pilots.keys()))
-        # print(len(json['atis']))
-        # print(len(atises.keys()))
-        # return pilots
+                result[getattr(j, key)] = j
+            self._conndata_cache.cache(result, name)
     
     @staticmethod
     def parse_timestampstr(timestr):
@@ -335,7 +351,11 @@ class VatsimLiveAPI():
             return d
         except ValueError as e:
             raise
- 
+            
+    @staticmethod
+    def wrap_if_single(input):
+        return [input] if isinstance(input, (str, int)) else input
+    
     def metars(self, fields=None, force_update=False):
         if fields is None:
             if force_update or self._metar_cache.is_stale():
@@ -358,40 +378,114 @@ class VatsimLiveAPI():
             # print(self._metar_cache._last_update_time)
             return self._metar_cache.get_cached(field)
 
-    def pilot(self, cid=None, callsign=None):
-        # maybe change the arguments to some kind of dictionary, or have callsign be a regex
-        if cid is None and callsign is None:
-            return None
-        elif cid is not None:
-            pass
+    def _update_conndata_if_needed(self, key='_ALL', update_mode=UpdateMode.NORMAL):
+        match update_mode:
+            case UpdateMode.NOUPDATE:
+                return
+            case UpdateMode.NORMAL:
+                if self._conndata_cache.is_stale(key):
+                    print('updating here')
+                    self._fetch_conn_data()
+                    print('done updating')
+            case UpdateMode.FORCE:
+                self._fetch_conn_data()
+
+    def pilot(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+        if cid is not None:
+            return self._return_single_exact_match('pilots', cid, update_mode)
+        elif callsign is not None:
+            def filter(v):
+                return getattr(v, 'callsign') == callsign
+            f = self._return_filtered('pilots', filter, update_mode)
+            return f[list(f.keys())[0]]
         else:
-            # If we are here we know that callsign is not None
-            pass
-
-    def pilots(self, cids=None, callsigns=None): #callsign should be regex? and what would CID do here, just allow return a single result as list?
-        pass
-
-    def controller(self, cid=None, callsign=None):
-        if cid is None and callsign is None:
             return None
-        elif cid is not None:
-            pass
+
+    def pilots(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #callsign should be regex? and what would CID do here, just allow return a single result as list?
+        return self._return_filtered_cid_or_callsign('pilots', cids, callsigns, update_mode)
+
+    def controller(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+        if cid is not None:
+            return self._return_single_exact_match('controllers', cid, update_mode)
+        elif callsign is not None:
+            def filter(v):
+                return getattr(v, 'callsign') == callsign
+            f = self._return_filtered('controllers', filter, update_mode)
+            return f[list(f.keys())[0]]
         else:
-            # If we are here we know that callsign is not None
-            pass
+            return None
 
-    def controllers(self): #cid or callsign? same as pilots above
-        pass
+    def controllers(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsign? same as pilots above
+        return self._return_filtered_cid_or_callsign('controllers', cids, callsigns, update_mode)
 
-    def atises(self): #cid or callsigns
-        pass
+    def atis(self, callsign, update_mode=UpdateMode.NORMAL): # cid will not be unique here, but callsign will
+        return self._return_single_exact_match('atis', callsign, update_mode)
 
-    def atis(self): # cid will not be unique here, but callsign will
-        pass
+    def atises(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsigns
+        return self._return_filtered_cid_or_callsign('atis', cids, callsigns, update_mode)
 
     # all, active only, or prefile only
     def flight_plans(self):
+        # TODO -- update
         pass
+        
+    def _return_whole(self, cache_key, update_mode):
+        self._update_conndata_if_needed(update_mode=update_mode)
+        return self._conndata_cache.get_cached(cache_key)
+    
+    def _return_filtered(self, cache_key, filter_func, update_mode):
+        self._update_conndata_if_needed(update_mode=update_mode)
+        r = {}
+        for k, v in self._conndata_cache.get_cached(cache_key).items():
+            if filter_func(v):
+                r[k] = v
+        return r if len(r.keys()) > 0 else None
+    
+    def _return_filtered_cid_or_callsign(self, cache_key, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL):
+        if cids is not None:
+            def filter(v):
+                return getattr(v, 'cid') in VatsimLiveAPI.wrap_if_single(cids)
+            return self._return_filtered(cache_key, filter, update_mode)
+        elif callsigns is not None:
+            def filter(v):
+                return any([re.search(i, getattr(v, 'callsign')) for i in VatsimLiveAPI.wrap_if_single(callsigns)])
+            return self._return_filtered(cache_key, filter, update_mode)
+        else:
+            self._return_whole(cache_key, update_mode)
+    
+    def _return_single_exact_match(self, cache_key, val_key, update_mode):
+        self._update_conndata_if_needed(update_mode=update_mode)
+        r = self._conndata_cache.get_cached(cache_key)
+        if val_key in r:
+            return r[val_key]
+        else:
+            return None
+    
+    def pilot_ratings(self, update_mode=UpdateMode.NORMAL):
+        return self._return_whole('pilot_ratings', update_mode)
+
+    def pilot_rating(self, id, update_mode=UpdateMode.NORMAL):
+        return self._return_single_exact_match('pilot_ratings', id, update_mode)
+
+    def facilities(self, update_mode=UpdateMode.NORMAL):
+        return self._return_whole('facilities', update_mode)
+
+    def facility(self, id, update_mode=UpdateMode.NORMAL):
+        return self._return_single_exact_match('facilities', id, update_mode)
+
+    def controller_ratings(self, update_mode=UpdateMode.NORMAL):
+        return self._return_whole('ratings', update_mode)
+
+    def controller_rating(self, id, update_mode=UpdateMode.NORMAL):
+        return self._return_single_exact_match('ratings', id, update_mode)
+
+    def servers(self, update_mode=UpdateMode.NORMAL):
+        return self._return_whole('servers', update_mode)
+    
+    def server(self, ident_str, update_mode=UpdateMode.NORMAL):
+        return self._return_single_exact_match('servers', ident_str, update_mode)
+
+
 
 
 # if __name__ == '__main__':
@@ -402,7 +496,18 @@ api = VatsimLiveAPI()
 #k = api.metars()
 #n = api.metar('KSFO')
 #print(k)
-api._fetch_conn_data()
+#api._fetch_conn_data()
+print(api.facility(5))
+print(api.facility(21))
+print(api.server('USA-WEST'))
+print(api.atis('EDDS_ATIS'))
+x = api.atises(callsigns=['KMCO', 'KIAD'])
+print(x)
+pp = pprint.PrettyPrinter(indent = 1)
+#pp.pprint(api.pilots(callsigns='WAT'))
+pp.pprint(api.pilot(callsign='WAT2992'))
+pp.pprint(api.controller(callsign='IND_CTR'))
+
 #print(api._parse_pilot(x))
 
 # r = requests.get('https://data.vatsim.net/v3/vatsim-data.json')
