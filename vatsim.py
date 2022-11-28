@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 import re
 from dataclasses import dataclass
+import pprint
 
 @dataclass
 class Flightplan:
@@ -111,12 +112,9 @@ class Pilot:
 @dataclass
 class NameTable:
     id: int
-    short_name: str
-    long_name: str
+    short: str
+    long: str
 
-
-@dataclass
-class PilotRating(NameTable):
     @classmethod
     def from_api_json(cls, json_dict, api=None):
         return cls(**json_dict)
@@ -124,17 +122,21 @@ class PilotRating(NameTable):
 
 @dataclass
 class Rating(NameTable):
-    @classmethod
-    def from_api_json(cls, json_dict, api=None):
-        return cls(**json_dict)
-
+    pass
 
 @dataclass
 class Facility(NameTable):
+    pass
+
+@dataclass
+class PilotRating(NameTable):
+    short_name: str
+    long_name: str
+    
     @classmethod
     def from_api_json(cls, json_dict, api=None):
-        json_dict['short_name'] = json_dict['short']
-        json_dict['long_name'] = json_dict['long']
+        json_dict['short'] = json_dict['short_name']
+        json_dict['long'] = json_dict['long_name']
         return cls(**json_dict)
 
 
@@ -201,7 +203,6 @@ class ATIS(Controller):
         args = json_dict
         if args['text_atis'] is not None:
             args['text_atis'] = ' '.join(args['text_atis'])
-        # TODO -- timestamps and facility and rating and server
         args['logon_time'] = VatsimLiveAPI.parse_timestampstr(args['logon_time'])
         args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
         # TODO -- facility and rating and server join
@@ -278,7 +279,7 @@ class VatsimLiveAPI():
 
         return metars
     
-    def _fetch_all_data(self):
+    def _fetch_conn_data(self):
         try:
             r = requests.get(self.vatsim_endpoints.data_json_url)
         except Exception as e:
@@ -286,27 +287,31 @@ class VatsimLiveAPI():
             
         json = r.json()
 
-        pilots = {}
-        for i in json['pilots']:
-            p = Pilot.from_api_json(i, self)
-            pilots[p.cid] = p
-        
-        controllers = {}
-        for i in json['controllers']:
-            c = Controller.from_api_json(i, self)
-            controllers[c.cid] = c
+        fetch_configs = {
+            'facilities'    : (Facility, 'from_api_json', 'id'),
+            'ratings'       : (Rating, 'from_api_json', 'id'),
+            'pilot_ratings' : (PilotRating, 'from_api_json', 'id'),
+            'pilots'        : (Pilot, 'from_api_json', 'cid'),
+            'controllers'   : (Controller, 'from_api_json', 'cid'),
+            'atis'          : (ATIS, 'from_api_json', 'callsign')  
+        }
 
-        atises = {}
-        for i in json['atis']:
-            a = ATIS.from_api_json(i, self)
-            atises[a.callsign] = a
-        
-        # TODO -- fetch and handle prefiles, facility levels, controller ratings, pilot ratings
+        result = {}
+        for name, (obj, constructor, key) in fetch_configs.items():
+            result[name] = {}
+            for i in json[name]:
+                j = getattr(obj, constructor)(i, self)
+                result[name][getattr(j, key)] = j
 
-        print(len(pilots.keys()))
-        print(len(json['atis']))
-        print(len(atises.keys()))
-        return pilots
+        pp = pprint.PrettyPrinter()
+        #pp.pprint(result)
+        
+        # # TODO -- fetch and handle prefiles, facility levels, controller ratings, pilot ratings
+
+        # print(len(pilots.keys()))
+        # print(len(json['atis']))
+        # print(len(atises.keys()))
+        # return pilots
     
     @staticmethod
     def parse_timestampstr(timestr):
@@ -397,7 +402,7 @@ api = VatsimLiveAPI()
 #k = api.metars()
 #n = api.metar('KSFO')
 #print(k)
-api._fetch_all_data()
+api._fetch_conn_data()
 #print(api._parse_pilot(x))
 
 # r = requests.get('https://data.vatsim.net/v3/vatsim-data.json')
