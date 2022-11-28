@@ -329,7 +329,7 @@ class VatsimDataAPI():
             # If we are here we know that callsign is not None
             pass
 
-    def pilots(self, cid=None, callsigns=None): #callsign should be regex? and what would CID do here, just allow return a single result as list?
+    def pilots(self, cids=None, callsigns=None): #callsign should be regex? and what would CID do here, just allow return a single result as list?
         pass
 
     def controller(self, cid=None, callsign=None):
