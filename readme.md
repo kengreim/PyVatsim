@@ -56,12 +56,12 @@ for cid, pilot in p.items():
     # Do something here
 
 c = vatsim.controllers(cids=[123456, 234567, 345678])
-for cid, pilot in c.items():
+for cid, controller in c.items():
     # Do something here
 ```
 
 ## Retrieve a list of pilots or controllers based on one or more string regular expressions
-`callsigns` argument expects either a single string or a list of strings. 
+`callsigns` argument expects either a single string or a list of strings. `callsigns` argument will be ignored if `cids` argument is provided, as in the example above.
 
 `pilots(callsigns)` will evaluate each string as a Python regular expression and return a dictionary of `Pilot` instances where the Pilot's callsign matches one of the given callsign regular expressions (using `re.search`), or `None` if no matches are found
 
@@ -73,12 +73,12 @@ for cid, pilot in p.items():
 
 # Note that last item uses regex to match OAK_CTR, OAK_41_CTR, OAK_44_CTR, etc. but not OAK_GND
 c = vatsim.controllers(callsigns=['SFO', 'SJC', 'OAK.*_CTR'])
-for cid, pilot in c.items():
+for cid, controller in c.items():
     # Do something here
 ```
 
 ## Retrieve a single pilot or controller by Vatsim CID or callsign
-`cid` argument expects an integer. `callsign` argument expects a string. 
+`cid` argument expects an integer. `callsign` argument expects a string. . If both `cid` and `callsign` arguments are provided, only `cid` will be used.
 
 `pilot()` returns a single `Pilot` instance based on exact CID or callsign string match (both are unique on the Vatsim network for Pilots) or `None`
 
@@ -110,6 +110,21 @@ for field, metar in m.items():
 m = vatsim.metar(field)
 ```
 
+## Access information about a pilot and their flightplan
+```python
+p = vatsim.pilots()
+for cid, pilot in p.items():
+    if pilot.flight_plan is not None:
+        print('%s departed from %s and is going to %s at current altitude %i' % (pilot.callsign, pilot.flight_plan.departure, pilot.flight_plan.arrival, pilot.altitude))
+    else:
+        print('%s is at current altitude %i with no flight plan' % (pilot.callsign, pilot.altitude))
+```
+
+## Get information about a controller
+
+
+# Todo
+TBD
 
 # License
 Vatsim Py-API is licensed under the MIT License.
