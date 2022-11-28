@@ -12,3 +12,6 @@ p = vatsim.pilots()
 for cid, pilot in p.items():
     print(cid)
 ```
+
+# License
+Vatsim Py-API is licensed under the MIT License.
