@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyvatsim"
-version = "0.1.0"
+version = "0.1.1"
 authors = [
   { name="Ken Greim", email="ken.greim+vatsimapi@gmail.com" },
 ]

@@ -1,5 +1,5 @@
-# What is Vatsim Py-API?
-Vatsim Py-API is a Python library to interact with data from Vatsim's live datafeed, currently located at: http://data.vatsim.net/. It implements Python objects to access the underlying Vatsim data in a Pythonic way, and also parses certain data into developer friendly formats (e.g., timestamp strings into Python datetime objects). 
+# What is PyVatsim?
+PyVatsim is a Python library to interact with data from Vatsim's live datafeed, currently located at: http://data.vatsim.net/. It implements Python objects to access the underlying Vatsim data in a Pythonic way, and also parses certain data into developer friendly formats (e.g., timestamp strings into Python datetime objects). 
 
 Because Vatsim's datafeed is updated every ~15 seconds, Py-API supports configurable caching of data from the datafeed so that each access method does not fetch the datafeed (although a "force update" override exists if needed).
 
@@ -14,7 +14,7 @@ The easiest way to install is via pip.
 pip install pyvatsim
 ```
 
-Alternatively, you can use the `vatsim` folder or `liveapi.py` as a package or single-file module, respectively. Make sure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
+Alternatively, you can use the `pyvatsim` folder or `liveapi.py` as a package or single-file module, respectively. Make sure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
 
 
 
@@ -29,16 +29,16 @@ TBD
 ## Create API object
 Use default caching periods (60 seconds for METARs and 15 seconds for network data)
 ```python
-import vatsim
-api = vatsim.VatsimLiveAPI()
+import pyvatsim
+api = pyvatsim.VatsimLiveAPI()
 ```
 
 ## Create API object with different cache TTLs
 Configurable with the `DATA_TTL` and `METAR_TTL` arguments, which speciy how long network data and METAR data should be cached (in seconds), respectively
 ```python
-import vatsim
+import pyvatsim
 # 1 min network data cache and 5 min METAR cache
-api = vatsim_api.VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
+api = pyvatsim.VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
 ```
 
 ## Retrieve all pilots or controllers and iterate through them
