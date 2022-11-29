@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 import re
 from dataclasses import dataclass
-import pprint
 from enum import Enum
 
 class UpdateMode(Enum):
@@ -12,114 +11,6 @@ class UpdateMode(Enum):
     NORMAL = 1
     FORCE = 2
 
-@dataclass
-class Flightplan:
-    flight_rules: str
-    aircraft: str
-    aircraft_faa: str
-    aircraft_short: str
-    departure: str
-    arrival: str
-    alternate: str
-    cruise_tas: int
-    altitude: int
-    deptime: datetime
-    enroute_time: timedelta
-    fuel_time: timedelta
-    remarks: str
-    route: str
-    revision_id: int
-    assigned_transponder: str
-
-    @classmethod
-    def from_api_json(cls, json_dict, api):
-
-        if json_dict is None:
-            return None
-        
-        args = json_dict
-        # print(fp_json)
-        # Vatsim API returns strings for some numeric values, so cast them
-        args['cruise_tas'] = int(args['cruise_tas'])
-
-        # Some altitudes are filed as feet, others are filed as FL. Convert all to feet
-        try:
-            args['altitude'] = int(args['altitude'])
-        except ValueError as e:
-            m = re.match(r'FL([0-9]*)', args['altitude'])
-            if m is not None:
-                args['altitude'] = int(m.group(1)) * 100
-            # else: the altitude is malformed, leave as the string that API returned
-
-        # Create datetime for filed departure time, and ensure that departure time is in the future
-        now = datetime.now(timezone.utc)
-        try: 
-            args['deptime'] = datetime(now.year, now.month, now.day, int(args['deptime'][:2]), int(args['deptime'][2:]), tzinfo=timezone.utc)
-            
-            # if prefile:
-            #     # TODO -- need to fix this logic, prefiles could have departure times in the past that shouldn't be updated, need some kind of rollover logic. Maybe check 2 hours from now
-            #     if args['deptime'] < now:
-            #         args['deptime'] += timedelta(days=1)
-            #         print(args['deptime']) # TODO -- we can delete
-
-        except ValueError as e:
-            pass # if the deptime is malformed and we can't create a datetime, leave as the string that API returned
-
-        # Create timedeltas to represent filed enroute_time and fuel time
-        args['enroute_time'] = timedelta(hours=int(args['enroute_time'][:2]), minutes=int(args['enroute_time'][2:]))
-        args['fuel_time'] = timedelta(hours=int(args['fuel_time'][:2]), minutes=int(args['fuel_time'][2:]))
-        
-        return cls(**args)
-
-
-@dataclass
-class Server:
-    ident: str
-    hostname_or_ip: str
-    location: str
-    name: str
-    clients_connection_allowed: bool
-    client_connections_allowed: bool
-    is_sweatbox: bool
-
-    @classmethod
-    def from_api_json(cls, json_dict, api):
-        args = json_dict
-        args['clients_connection_allowed'] = bool(args['clients_connection_allowed'])
-        return cls(**args)
-
-@dataclass
-class Pilot:
-    cid: int
-    name: str
-    callsign: str
-    server: Server
-    pilot_rating: int # todo -- update
-    latitude: float
-    longitude: float
-    altitude: int
-    groundspeed: int
-    transponder: str
-    heading: int
-    qnh_i_hg: float
-    qnh_mb: int
-    flight_plan: Flightplan
-    logon_time: datetime
-    last_updated: datetime
-
-    @classmethod
-    def from_api_json(cls, json_dict, api):
-        args = json_dict
-        # TODO: Pilot Rating lookup
-        args['pilot_rating'] = api.pilot_rating(args['pilot_rating'])
-        args['server'] = api.server(args['server'])
-        args['flight_plan'] = Flightplan.from_api_json(args['flight_plan'], api)
-        args['logon_time'] = VatsimLiveAPI.parse_timestampstr(args['logon_time'])
-        args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
-
-        # add a field for time online? Maybe as post_init on class itself
-
-        return cls(**args)
 
 @dataclass
 class NameTable:
@@ -152,6 +43,127 @@ class PilotRating(NameTable):
         json_dict['short'] = json_dict['short_name']
         json_dict['long'] = json_dict['long_name']
         return cls(**json_dict)
+
+
+@dataclass
+class Server:
+    ident: str
+    hostname_or_ip: str
+    location: str
+    name: str
+    clients_connection_allowed: bool
+    client_connections_allowed: bool
+    is_sweatbox: bool
+
+    @classmethod
+    def from_api_json(cls, json_dict, api):
+        args = json_dict
+        args['clients_connection_allowed'] = bool(args['clients_connection_allowed'])
+        return cls(**args)
+
+
+@dataclass
+class Flightplan:
+    flight_rules: str
+    aircraft: str
+    aircraft_faa: str
+    aircraft_short: str
+    departure: str
+    arrival: str
+    alternate: str
+    cruise_tas: int
+    altitude: int
+    deptime: datetime
+    enroute_time: timedelta
+    fuel_time: timedelta
+    remarks: str
+    route: str
+    revision_id: int
+    assigned_transponder: str
+
+    @classmethod
+    def from_api_json(cls, json_dict, api):
+
+        if json_dict is None:
+            return None
+        
+        args = json_dict
+
+        # Vatsim API returns strings for some numeric values, so cast them
+        args['cruise_tas'] = int(args['cruise_tas'])
+
+        # Some altitudes are filed as feet, others are filed as FL. Convert all to feet
+        try:
+            args['altitude'] = int(args['altitude'])
+        except ValueError as e:
+            m = re.match(r'FL([0-9]*)', args['altitude'])
+            if m is not None:
+                args['altitude'] = int(m.group(1)) * 100
+            # else: the altitude is malformed, leave as the string that API returned
+
+        # Create datetime for filed departure time
+        now = datetime.now(timezone.utc)
+        try: 
+            # TODO -- still need to clean up the departure time logic
+            # Start with naive interpretation that the hours and minutes belong to today
+            args['deptime'] = datetime(now.year, now.month, now.day, int(args['deptime'][:2]), int(args['deptime'][2:]), tzinfo=timezone.utc)
+            
+            # If we find a DOF field in the remarks, that gives us the exact year, time and day. Although this might not always be right...
+            # r = re.search(r'DOF/([0-9]{6})', args['remarks'])
+            # if r is not None:
+            #     print(r.group())
+            #     d = datetime.strptime(r.group(), '%y%m%d')
+            #     print(d)
+            #     args['deptime']= args['deptime'].replace(year=d.year, month=d.month, day=d.day)
+            
+            # if prefile:
+            #     # TODO -- need to fix this logic, prefiles could have departure times in the past that shouldn't be updated, need some kind of rollover logic. Maybe check 2 hours from now
+            #     if args['deptime'] < now:
+            #         args['deptime'] += timedelta(days=1)
+            #         print(args['deptime']) # TODO -- we can delete
+
+        except ValueError as e:
+            pass # if the deptime is malformed and we can't create a datetime, leave as the string that API returned
+
+        # Create timedeltas to represent filed enroute_time and fuel time
+        args['enroute_time'] = timedelta(hours=int(args['enroute_time'][:2]), minutes=int(args['enroute_time'][2:]))
+        args['fuel_time'] = timedelta(hours=int(args['fuel_time'][:2]), minutes=int(args['fuel_time'][2:]))
+        
+        return cls(**args)
+
+
+@dataclass
+class Pilot:
+    cid: int
+    name: str
+    callsign: str
+    server: Server
+    pilot_rating: PilotRating
+    latitude: float
+    longitude: float
+    altitude: int
+    groundspeed: int
+    transponder: str
+    heading: int
+    qnh_i_hg: float
+    qnh_mb: int
+    flight_plan: Flightplan
+    logon_time: datetime
+    last_updated: datetime
+
+    @classmethod
+    def from_api_json(cls, json_dict, api):
+        args = json_dict
+        # TODO: Pilot Rating lookup
+        args['pilot_rating'] = api.pilot_rating(args['pilot_rating'])
+        args['server'] = api.server(args['server'])
+        args['flight_plan'] = Flightplan.from_api_json(args['flight_plan'], api)
+        args['logon_time'] = VatsimLiveAPI.parse_timestampstr(args['logon_time'])
+        args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
+
+        # add a field for time online? Maybe as post_init on class itself
+
+        return cls(**args)
 
 
 @dataclass
@@ -241,10 +253,7 @@ class TTLCache():
             return self._cache[key] == None or (now - self._last_update_time[key]).total_seconds() > self.ttl
     
     def get_cached(self, key='_ALL'):
-        if key in self._cache:
-            return self._cache[key] # should probably add logic checks for stale data here, maybe throw error if attempting to get cached data older than TTL
-        else:
-            return None
+        return self._cache[key] if key in self._cache else None # should probably add logic checks for stale data here, maybe throw error if attempting to get cached data older than TTL
 
     def cache(self, val, key='_ALL'):
         self._cache[key] = val
@@ -288,7 +297,6 @@ class VatsimLiveAPI():
         else:
             field_str = ','.join(fields)
         url = self.vatsim_endpoints.metar_php_url + '?' + urlencode({'id': field_str})
-        # print(url)
         try:
             r = requests.get(url)
         except Exception as e:
@@ -333,22 +341,19 @@ class VatsimLiveAPI():
     def parse_timestampstr(timestr):
         try:
             d = datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%SZ')
-            d = d.replace(tzinfo=timezone.utc)
-            return d
+            return d.replace(tzinfo=timezone.utc)
         except ValueError as e:
             pass
         
         try:
             d = datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%S.%fZ')
-            d = d.replace(tzinfo=timezone.utc)
-            return d
+            return d.replace(tzinfo=timezone.utc)
         except ValueError as e:
             pass
         
         try:
             d = datetime.strptime(timestr[:26], '%Y-%m-%dT%H:%M:%S.%f')
-            d = d.replace(tzinfo=timezone.utc)
-            return d
+            return d.replace(tzinfo=timezone.utc)
         except ValueError as e:
             raise
             
@@ -363,7 +368,6 @@ class VatsimLiveAPI():
                 self._metar_cache.cache(new_metars)
                 return new_metars
             else:
-                # print('cache alive')
                 return self._metar_cache.get_cached()
         else:
             pass # TODO: handle list of fields. Need to construc the fresh list and the stale list separately then fetch as needed
@@ -374,8 +378,6 @@ class VatsimLiveAPI():
             self._metar_cache.cache(metar, field)
             return metar
         else:
-            #print('cache alive')
-            # print(self._metar_cache._last_update_time)
             return self._metar_cache.get_cached(field)
 
     def _update_conndata_if_needed(self, key='_ALL', update_mode=UpdateMode.NORMAL):
@@ -384,51 +386,10 @@ class VatsimLiveAPI():
                 return
             case UpdateMode.NORMAL:
                 if self._conndata_cache.is_stale(key):
-                    print('updating here')
                     self._fetch_conn_data()
-                    print('done updating')
             case UpdateMode.FORCE:
                 self._fetch_conn_data()
-
-    def pilot(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
-        if cid is not None:
-            return self._return_single_exact_match('pilots', cid, update_mode)
-        elif callsign is not None:
-            def filter(v):
-                return getattr(v, 'callsign') == callsign
-            f = self._return_filtered('pilots', filter, update_mode)
-            return f[list(f.keys())[0]]
-        else:
-            return None
-
-    def pilots(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #callsign should be regex? and what would CID do here, just allow return a single result as list?
-        return self._return_filtered_cid_or_callsign('pilots', cids, callsigns, update_mode)
-
-    def controller(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
-        if cid is not None:
-            return self._return_single_exact_match('controllers', cid, update_mode)
-        elif callsign is not None:
-            def filter(v):
-                return getattr(v, 'callsign') == callsign
-            f = self._return_filtered('controllers', filter, update_mode)
-            return f[list(f.keys())[0]]
-        else:
-            return None
-
-    def controllers(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsign? same as pilots above
-        return self._return_filtered_cid_or_callsign('controllers', cids, callsigns, update_mode)
-
-    def atis(self, callsign, update_mode=UpdateMode.NORMAL): # cid will not be unique here, but callsign will
-        return self._return_single_exact_match('atis', callsign, update_mode)
-
-    def atises(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsigns
-        return self._return_filtered_cid_or_callsign('atis', cids, callsigns, update_mode)
-
-    # all, active only, or prefile only
-    def flight_plans(self):
-        # TODO -- update
-        pass
-        
+            
     def _return_whole(self, cache_key, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
         return self._conndata_cache.get_cached(cache_key)
@@ -456,10 +417,41 @@ class VatsimLiveAPI():
     def _return_single_exact_match(self, cache_key, val_key, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
         r = self._conndata_cache.get_cached(cache_key)
-        if val_key in r:
-            return r[val_key]
+        return r[val_key] if val_key in r else None
+
+    def pilot(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+        if cid is not None:
+            return self._return_single_exact_match('pilots', cid, update_mode)
+        elif callsign is not None:
+            def filter(v):
+                return getattr(v, 'callsign') == callsign
+            f = self._return_filtered('pilots', filter, update_mode)
+            return f[list(f.keys())[0]]
         else:
             return None
+
+    def pilots(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): # list of CIDS or a list of callsign regex
+        return self._return_filtered_cid_or_callsign('pilots', cids, callsigns, update_mode)
+
+    def controller(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+        if cid is not None:
+            return self._return_single_exact_match('controllers', cid, update_mode)
+        elif callsign is not None:
+            def filter(v):
+                return getattr(v, 'callsign') == callsign
+            f = self._return_filtered('controllers', filter, update_mode)
+            return f[list(f.keys())[0]]
+        else:
+            return None
+
+    def controllers(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsign? same as pilots above
+        return self._return_filtered_cid_or_callsign('controllers', cids, callsigns, update_mode)
+
+    def atis(self, callsign, update_mode=UpdateMode.NORMAL): # cid will not be unique here, but callsign will
+        return self._return_single_exact_match('atis', callsign, update_mode)
+
+    def atises(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsigns
+        return self._return_filtered_cid_or_callsign('atis', cids, callsigns, update_mode)
     
     def pilot_ratings(self, update_mode=UpdateMode.NORMAL):
         return self._return_whole('pilot_ratings', update_mode)
@@ -484,43 +476,8 @@ class VatsimLiveAPI():
     
     def server(self, ident_str, update_mode=UpdateMode.NORMAL):
         return self._return_single_exact_match('servers', ident_str, update_mode)
-
-
-
-
-# if __name__ == '__main__':
-
-api = VatsimLiveAPI()
-# m = api.metars()
-# n = api.metars()
-#k = api.metars()
-#n = api.metar('KSFO')
-#print(k)
-#api._fetch_conn_data()
-#print(api.facility(5))
-#print(api.facility(21))
-#print(api.server('USA-WEST'))
-#print(api.atis('EDDS_ATIS'))
-#x = api.atises(callsigns=['KMCO', 'KIAD'])
-#print(x)
-pp = pprint.PrettyPrinter(indent = 1)
-#pp.pprint(api.pilots(callsigns='WAT'))
-#pp.pprint(api.pilot(callsign='WAT2992'))
-#pp.pprint(api.controller(callsign='IND_CTR'))
-
-#print(api._parse_pilot(x))
-
-# r = requests.get('https://data.vatsim.net/v3/vatsim-data.json')
-# x = r.json()['pilots'][0]['flight_plan']
-# print(x)
-# y = Flightplan(**x)
-# print(y)
-# print(y.remarks)
-
-
-p = api.pilots()
-for cid, pilot in p.items():
-    if pilot.flight_plan is not None:
-        print('%s departed from %s and is going to %s at current altitude %i' % (pilot.callsign, pilot.flight_plan.departure, pilot.flight_plan.arrival, pilot.altitude))
-    else:
-        print('%s is at current altitude %i with no flight plan' % (pilot.callsign, pilot.altitude))
+    
+    # all, active only, or prefile only
+    def flight_plans(self):
+        # TODO -- update
+        pass
