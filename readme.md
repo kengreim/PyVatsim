@@ -4,10 +4,19 @@ Vatsim Py-API is a Python library to interact with data from Vatsim's live dataf
 Because Vatsim's datafeed is updated every ~15 seconds, Py-API supports configurable caching of data from the datafeed so that each access method does not fetch the datafeed (although a "force update" override exists if needed).
 
 # Status
-:warning: This library is a work-in-progress and does not yet fully support the examples / functionality detailed below. This warning will be removed when there is full support
+This project is in alpha state. It currently offers full functionality to access the Vatsim live data (with time-based caching support), but
+further work is needed in the areas of: documentation, error handling, caching, configurability, testing.
 
 # Installation
-Will be packaged for easy installation with `pip` when the initial release is ready. Until then, simply use `vatsim_live_api.py` and ensure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
+
+The easiest way to install is via pip.
+```
+pip install vatsim-api
+```
+
+Alternatively, you can use the `vatsim` folder or `liveapi.py` as a package or single-file module, respectively. Make sure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
+
+
 
 # Full Documentation
 TBD
@@ -20,16 +29,16 @@ TBD
 ## Create API object
 Use default caching periods (60 seconds for METARs and 15 seconds for network data)
 ```python
-import vatsim_api
-vatsim = vatsim_api.VatsimLiveAPI()
+import vatsim
+api = vatsim.VatsimLiveAPI()
 ```
 
 ## Create API object with different cache TTLs
 Configurable with the `DATA_TTL` and `METAR_TTL` arguments, which speciy how long network data and METAR data should be cached (in seconds), respectively
 ```python
-import vatsim_api
+import vatsim
 # 1 min network data cache and 5 min METAR cache
-vatsim = vatsim_api.VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
+api = vatsim_api.VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
 ```
 
 ## Retrieve all pilots or controllers and iterate through them
@@ -37,11 +46,11 @@ vatsim = vatsim_api.VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
 
 `controllers()` returns a dictionary of `Controller` instances with each `Controller.cid` as the dictionary key
 ```python
-p = vatsim.pilots()
+p = api.pilots()
 for cid, pilot in p.items():
     # Do something here
 
-c = vatsim.controllers()
+c = api.controllers()
 for cid, controller in c.items():
     # Do something here
 ```
@@ -53,11 +62,11 @@ for cid, controller in c.items():
 
 `controllers(cid)` returns a dictionary of `Controller` instances based on exact CID matches, or `None` if no matches are found
 ```python
-p = vatsim.pilots(cids=[123456, 234567, 345678])
+p = api.pilots(cids=[123456, 234567, 345678])
 for cid, pilot in p.items():
     # Do something here
 
-c = vatsim.controllers(cids=[123456, 234567, 345678])
+c = api.controllers(cids=[123456, 234567, 345678])
 for cid, controller in c.items():
     # Do something here
 ```
@@ -69,12 +78,12 @@ for cid, controller in c.items():
 
 `controllers(callsigns)` will evaluate each string as a Python regular expression and return a dictionary of `Controller` instances where the Controller's callsign matches one of the given callsign regular expressions (using `re.search`), or `None` if no matches are found
 ```python
-p = vatsim.pilots(callsigns=['UAL123', 'UAL', 'SWA'])
+p = api.pilots(callsigns=['UAL123', 'UAL', 'SWA'])
 for cid, pilot in p.items():
     # Do something here
 
 # Note that last item uses regex to match OAK_CTR, OAK_41_CTR, OAK_44_CTR, etc. but not OAK_GND
-c = vatsim.controllers(callsigns=['SFO', 'SJC', 'OAK.*_CTR'])
+c = api.controllers(callsigns=['SFO', 'SJC', 'OAK.*_CTR'])
 for cid, controller in c.items():
     # Do something here
 ```
@@ -86,35 +95,35 @@ for cid, controller in c.items():
 
 `controller()` returns a single `Controller` instance based on exact CID or callsign string match (both are unique on the Vatsim network for Controllers) or `None`
 ```python
-p1 = vatsim.pilot(cid=123456)
-p2 = vatsim.pilot(callsign='UAL123')
+p1 = api.pilot(cid=123456)
+p2 = api.pilot(callsign='UAL123')
 
-c1 = vatsim.controller(cid=123456)
-c2 = vatsim.controller(callsign='SFO_TWR')
+c1 = api.controller(cid=123456)
+c2 = api.controller(callsign='SFO_TWR')
 ```
 
 ## Retrieve all METARs
 ```python
-m = vatsim.metars()
+m = api.metars()
 for field, metar in m.items():
     # Do something
 ```
 
 ## Retrieve a subset of METARs
 ```python
-m = vatsim.metars(fields)
+m = api.metars(['KSFO', 'KLAX'], ['KSJC'])
 for field, metar in m.items():
     # Do something
 ```
 
 ## Retrieve a single METAR
 ```python
-m = vatsim.metar(field)
+m = api.metar('KSFO')
 ```
 
 ## Access information about a pilot and their flightplan
 ```python
-p = vatsim.pilots()
+p = api.pilots()
 for cid, pilot in p.items():
     if pilot.flight_plan is not None:
         print('%s departed from %s and is going to %s at current altitude %i' % (pilot.callsign, pilot.flight_plan.departure, pilot.flight_plan.arrival, pilot.altitude))
@@ -123,7 +132,11 @@ for cid, pilot in p.items():
 ```
 
 ## Get information about a controller
-
+```python
+c = api.controllers()
+for cid, controller in c.items():
+    print('%s controlling position %s on %s' % (controller.name, controller.callsign, controller.frequency))
+```
 
 # Todo
 TBD

@@ -6,19 +6,19 @@ build-backend = "hatchling.build"
 name = "vatsim_api"
 version = "0.0.1"
 authors = [
-  { name="Ken Greim", email="ken@kengreim.com" },
+  { name="Ken Greim", email="ken.greim+vatsimapi@gmail.com" },
 ]
-description = "Python library to access Vatsim live data and APIs"
+description = "Library to access Vatsim live data and APIs"
 readme = "README.md"
 requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    Development Status :: 3 - Alpha,
-    Intended Audience :: Developers,
-    Topic :: Games/Entertainment :: Simulation,
-    Topic :: Software Development :: Libraries :: Python Modules
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Games/Entertainment :: Simulation",
+    "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 dependencies = [
   'requests >= 2.28',
