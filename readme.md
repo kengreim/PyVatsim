@@ -144,13 +144,17 @@ a1 = api.atis('KSFO_ATIS')
 ```
 
 ## Retrieve all METARs
+`metars()` returns a dictionary of `Metar` instances with each `Metar.field` (4-character ICAO string) as the dictionary key
 ```python
 m = api.metars()
 for field, metar in m.items():
-    # Do something
+    print('Condition for %s is %s' % (field, metar.condition))
 ```
 
 ## Retrieve a subset of METARs
+`fields` argument expects a string or a list of strings
+
+`metars(fields)` will evaluate each string as a Python regular expression and return a dictionary of `Metar` instances where the Metar's field string matches one of the given field regular expressions (using `re.search`), or `None` if no matches are found
 ```python
 m = api.metars(['KSFO', 'KLAX', 'KSJC'])
 for field, metar in m.items():
@@ -158,6 +162,9 @@ for field, metar in m.items():
 ```
 
 ## Retrieve a single METAR
+`field` argument expects a string
+
+`metar(field)` returns a single `Metar` instance based on exact field string match or `None`
 ```python
 m = api.metar('KSFO')
 ```
@@ -180,6 +187,9 @@ for cid, controller in c.items():
 ```
 
 ## Force a request to fetch fresh data, or force a request to use cached data
+`update_mode` is an optional argument to all functions. It defaults to `UpdateMode.NORMAL` which will check if the cache is stale (based on the TTL set when the `VatsimLiveAPI` instance was created),
+and update if needed. `UpdateMode.FORCE` will bypass the stale check and fetch the latest data. `UpdateMode.NOUPDATE` will return cached data only
+
 ```python
 c = api.controllers(update_mode=pyvatsim.UpdateMode.FORCE)
 c = api.controllers(update_mode=pyvatsim.UpdateMode.NOUPDATE)
