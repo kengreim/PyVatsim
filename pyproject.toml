@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vatsim_api"
-version = "0.0.1"
+name = "pyvatsim"
+version = "0.1.0"
 authors = [
   { name="Ken Greim", email="ken.greim+vatsimapi@gmail.com" },
 ]

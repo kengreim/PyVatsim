@@ -11,7 +11,7 @@ further work is needed in the areas of: documentation, error handling, caching, 
 
 The easiest way to install is via pip.
 ```
-pip install vatsim-api
+pip install pyvatsim
 ```
 
 Alternatively, you can use the `vatsim` folder or `liveapi.py` as a package or single-file module, respectively. Make sure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
