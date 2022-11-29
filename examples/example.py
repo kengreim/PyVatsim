@@ -1,4 +1,4 @@
-import vatsim
+import vatsim as vatsim
 import pprint
 
 # if __name__ == '__main__':

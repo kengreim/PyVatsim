@@ -325,7 +325,7 @@ class VatsimLiveAPI():
 
         return metars
     
-    def _fetch_conn_data(self):
+    def _fetch_and_cache_conn_data(self):
         try:
             r = requests.get(self.vatsim_endpoints.data_json_url)
         except Exception as e:
@@ -378,24 +378,31 @@ class VatsimLiveAPI():
     def wrap_if_single(input):
         return [input] if isinstance(input, (str, int)) else input
     
-    def metars(self, fields=None, force_update=False):
-        if fields is None:
-            if force_update or self._metar_cache.is_stale():
+    def _update_metars_if_needed(self, key='_ALL', update_mode=UpdateMode.NORMAL):
+        match update_mode:
+            case UpdateMode.NOUPDATE:
+                return
+            case UpdateMode.NORMAL:
+                if self._metar_cache.is_stale(key):
+                    new_metars = self._fetch_metars('all')
+                    self._metar_cache.cache(new_metars)
+            case UpdateMode.FORCE:
                 new_metars = self._fetch_metars('all')
                 self._metar_cache.cache(new_metars)
-                return new_metars
-            else:
-                return self._metar_cache.get_cached()
+    
+    def metars(self, fields=None, update_mode=UpdateMode.NORMAL):
+        self._update_metars_if_needed(update_mode=update_mode)
+        if fields is None:
+            return self._metar_cache.get_cached()
         else:
-            pass # TODO: handle list of fields. Need to construct the fresh list and the stale list separately then fetch as needed
+            # TODO -- can probably be smarter about not requesting all metars from API, but for now this works
+            r = {k: v for k, v in self._metar_cache.get_cached().items() if k in VatsimLiveAPI.wrap_if_single(fields)}
+            return r if len(r.keys()) > 0 else None
 
-    def metar(self, field, force_update=False):
-        if force_update or self._metar_cache.is_stale(field):
-            metar = self._fetch_metars(field)
-            self._metar_cache.cache(metar, field)
-            return metar
-        else:
-            return self._metar_cache.get_cached(field)
+    def metar(self, field, update_mode=UpdateMode.NORMAL):
+        self._update_metars_if_needed(update_mode=update_mode) # could only request 1 filed instead of all
+        cached = self._metar_cache.get_cached()
+        return cached[field] if field in cached else None
 
     def _update_conndata_if_needed(self, key='_ALL', update_mode=UpdateMode.NORMAL):
         match update_mode:
@@ -403,9 +410,9 @@ class VatsimLiveAPI():
                 return
             case UpdateMode.NORMAL:
                 if self._conndata_cache.is_stale(key):
-                    self._fetch_conn_data()
+                    self._fetch_and_cache_conn_data()
             case UpdateMode.FORCE:
-                self._fetch_conn_data()
+                self._fetch_and_cache_conn_data()
             
     def _return_whole(self, cache_key, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
@@ -438,7 +445,7 @@ class VatsimLiveAPI():
             def filter(v):
                 return getattr(v, 'callsign') == callsign
             f = self._return_filtered(cache_key, filter, update_mode)
-            return f[list(f.keys())[0]]
+            return f[list(f.keys())[0]] if f is not None else None
         else:
             return None
     
@@ -506,7 +513,11 @@ import pprint
 api = VatsimLiveAPI()
 # m = api.metars()
 # n = api.metars()
-#k = api.metars()
+k = api.metars(['KSFO', 'KLAX'])
+print(k)
+# n = api.metars()
+k = api.metars('KSEA')
+print(k)
 #n = api.metar('KSFO')
 #print(k)
 #api._fetch_conn_data()
@@ -517,10 +528,11 @@ api = VatsimLiveAPI()
 #x = api.atises(callsigns=['KMCO', 'KIAD'])
 #print(x)
 pp = pprint.PrettyPrinter(indent = 1)
-print(api.prefiled_pilots())
+#print(api.prefiled_pilots())
 #pp.pprint(api.pilots(callsigns='WAT'))
 #pp.pprint(api.pilot(callsign='WAT2992'))
-#pp.pprint(api.controller(callsign='IND_CTR'))
+pp.pprint(api.controller(callsign='LAS_TWR'))
+pp.pprint(api.atises(cids=1573809))
 
 #print(api._parse_pilot(x))
 

@@ -7,7 +7,7 @@ Because Vatsim's datafeed is updated every ~15 seconds, Py-API supports configur
 :warning: This library is a work-in-progress and does not yet fully support the examples / functionality detailed below. This warning will be removed when there is full support
 
 # Installation
-Will be packaged for easy installation with `pip` when the initial release is ready. Until then, simply use `vatsim.py` and `constants.py` and ensure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
+Will be packaged for easy installation with `pip` when the initial release is ready. Until then, simply use `vatsim_live_api.py` and ensure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
 
 # Full Documentation
 TBD
