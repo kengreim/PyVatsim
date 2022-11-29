@@ -20,14 +20,16 @@ TBD
 ## Create API object
 Use default caching periods (60 seconds for METARs and 15 seconds for network data)
 ```python
-vatsim = VatsimLiveAPI()
+import vatsim_api
+vatsim = vatsim_api.VatsimLiveAPI()
 ```
 
 ## Create API object with different cache TTLs
 Configurable with the `DATA_TTL` and `METAR_TTL` arguments, which speciy how long network data and METAR data should be cached (in seconds), respectively
 ```python
+import vatsim_api
 # 1 min network data cache and 5 min METAR cache
-vatsim = VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
+vatsim = vatsim_api.VatsimLiveAPI(DATA_TTL=60, METAR_TTL=300)
 ```
 
 ## Retrieve all pilots or controllers and iterate through them
