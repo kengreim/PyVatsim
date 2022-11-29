@@ -16,7 +16,15 @@ pip install pyvatsim
 
 Alternatively, you can use the `pyvatsim` folder or `liveapi.py` as a package or single-file module, respectively. Make sure you have the necessary 3rd-party libraries installed with `pip` (at the moment, only `requests` is required).
 
-
+# How to Develop
+Clone the repo and create a new Python virtual environment using `requirements.txt`, which should look something like:
+```
+git clone https://github.com/kengreim/PyVatsim.git
+cd pyvatsim
+python3 -m venv venv
+./venv/Scripts/Activate
+pip install -r requirements.txt
+```
 
 # Full Documentation
 TBD
@@ -111,7 +119,7 @@ for field, metar in m.items():
 
 ## Retrieve a subset of METARs
 ```python
-m = api.metars(['KSFO', 'KLAX'], ['KSJC'])
+m = api.metars(['KSFO', 'KLAX', 'KSJC'])
 for field, metar in m.items():
     # Do something
 ```

@@ -1,9 +1,12 @@
+from __future__ import annotations # Required for type annotations to use forward reference
 import requests
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Optional
+
 
 # Constants
 STATUS_JSON_URL = 'https://status.vatsim.net/status.json'
@@ -41,7 +44,7 @@ class PilotRating(NameTable):
     long_name: str
     
     @classmethod
-    def from_api_json(cls, json_dict, api=None):
+    def from_api_json(cls, json_dict: dict, api: Optional[VatsimLiveAPI] = None) -> PilotRating:
         json_dict['short'] = json_dict['short_name']
         json_dict['long'] = json_dict['long_name']
         return cls(**json_dict)
@@ -58,7 +61,7 @@ class Server:
     is_sweatbox: bool
 
     @classmethod
-    def from_api_json(cls, json_dict, api):
+    def from_api_json(cls, json_dict: dict, api: Optional[VatsimLiveAPI] = None) -> Server:
         args = json_dict
         args['clients_connection_allowed'] = bool(args['clients_connection_allowed'])
         return cls(**args)
@@ -84,7 +87,7 @@ class Flightplan:
     assigned_transponder: str
 
     @classmethod
-    def from_api_json(cls, json_dict, api):
+    def from_api_json(cls, json_dict: dict, api: Optional[VatsimLiveAPI] = None) -> Flightplan:
 
         if json_dict is None:
             return None
@@ -142,7 +145,7 @@ class PrefiledPilot:
     last_updated: datetime
 
     @classmethod
-    def from_api_json(cls, json_dict, api):
+    def from_api_json(cls, json_dict: dict, api: VatsimLiveAPI) -> PrefiledPilot:
         args = json_dict
         args['flight_plan'] = Flightplan.from_api_json(args['flight_plan'], api)
         args['last_updated'] = VatsimLiveAPI.parse_timestampstr(args['last_updated'])
@@ -169,7 +172,7 @@ class ActivePilot:
     last_updated: datetime
 
     @classmethod
-    def from_api_json(cls, json_dict, api):
+    def from_api_json(cls, json_dict: dict, api: VatsimLiveAPI) -> ActivePilot:
         args = json_dict
         args['pilot_rating'] = api.pilot_rating(args['pilot_rating'])
         args['server'] = api.server(args['server'])
@@ -190,7 +193,7 @@ class Metar:
     raw_text: str
 
     @classmethod
-    def from_raw_text(cls, raw_text, api=None):
+    def from_raw_text(cls, raw_text: str, api: Optional[VatsimLiveAPI] = None) -> Metar:
         r = re.compile(r'(?P<field>[\S]+?) (?P<time>[0-9]{6}Z?) (?P<condition>.*)')
         try:
             m = r.match(raw_text)
@@ -226,7 +229,7 @@ class Controller:
     logon_time: datetime
 
     @classmethod
-    def from_api_json(cls, json_dict, api):
+    def from_api_json(cls, json_dict: dict, api: VatsimLiveAPI) -> Controller:
         args = json_dict
         if args['text_atis'] is not None:
             args['text_atis'] = '\n'.join(args['text_atis'])
@@ -243,7 +246,7 @@ class ATIS(Controller):
     atis_code: str
 
     @classmethod
-    def from_api_json(cls, json_dict, api):
+    def from_api_json(cls, json_dict: dict, api: VatsimLiveAPI) -> ATIS:
         args = json_dict
         if args['text_atis'] is not None:
             args['text_atis'] = ' '.join(args['text_atis'])
@@ -279,7 +282,7 @@ class TTLCache():
 
 class VatsimEndpoints():
 
-    def __init__(self, status_url=STATUS_JSON_URL):
+    def __init__(self, status_url: str = STATUS_JSON_URL) -> None:
 
         try:
             r = requests.get(status_url)
@@ -298,7 +301,7 @@ class VatsimEndpoints():
 
 class VatsimLiveAPI():
 
-    def __init__(self, vatsim_endpoints=None, DATA_TTL=15, METAR_TTL=60):  # change timeouts to be configurable here
+    def __init__(self, vatsim_endpoints: VatsimEndpoints = None, DATA_TTL: int = 15, METAR_TTL: int = 60) -> None:
         if vatsim_endpoints is None:
             self.vatsim_endpoints = VatsimEndpoints()
         else:
@@ -355,7 +358,7 @@ class VatsimLiveAPI():
             self._conndata_cache.cache(result, name)
     
     @staticmethod
-    def parse_timestampstr(timestr):
+    def parse_timestampstr(timestr: str) -> datetime:
         try:
             d = datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%SZ')
             return d.replace(tzinfo=timezone.utc)
@@ -390,7 +393,7 @@ class VatsimLiveAPI():
                 new_metars = self._fetch_metars('all')
                 self._metar_cache.cache(new_metars)
     
-    def metars(self, fields=None, update_mode=UpdateMode.NORMAL):
+    def metars(self, fields: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[str, Metar]:
         self._update_metars_if_needed(update_mode=update_mode)
         if fields is None:
             return self._metar_cache.get_cached()
@@ -399,7 +402,7 @@ class VatsimLiveAPI():
             r = {k: v for k, v in self._metar_cache.get_cached().items() if k in VatsimLiveAPI.wrap_if_single(fields)}
             return r if len(r.keys()) > 0 else None
 
-    def metar(self, field, update_mode=UpdateMode.NORMAL):
+    def metar(self, field: str, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | Metar:
         self._update_metars_if_needed(update_mode=update_mode) # could only request 1 filed instead of all
         cached = self._metar_cache.get_cached()
         return cached[field] if field in cached else None
@@ -454,52 +457,52 @@ class VatsimLiveAPI():
         r = self._conndata_cache.get_cached(cache_key)
         return r[val_key] if val_key in r else None
 
-    def pilot(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+    def pilot(self, cid: Optional[int] = None, callsign: Optional[str] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | ActivePilot:
         return self._return_single_filtered_cid_or_callsign('pilots', cid, callsign, update_mode)
 
-    def pilots(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): # list of CIDS or a list of callsign regex
+    def pilots(self, cids: Optional[int | list[int]] = None, callsigns: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, ActivePilot]:
         return self._return_list_filtered_cid_or_callsign('pilots', cids, callsigns, update_mode)
 
-    def prefiled_pilot(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+    def prefiled_pilot(self, cid: Optional[int] = None, callsign: Optional[str] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | PrefiledPilot:
         return self._return_single_filtered_cid_or_callsign('prefiles', cid, callsign, update_mode)
 
-    def prefiled_pilots(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): # list of CIDS or a list of callsign regex
+    def prefiled_pilots(self, cids: Optional[int | list[int]] = None, callsigns: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, PrefiledPilot]:
         return self._return_list_filtered_cid_or_callsign('prefiles', cids, callsigns, update_mode)
 
-    def controller(self, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
+    def controller(self, cid: Optional[int] = None, callsign: Optional[str] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | Controller:
         return self._return_single_filtered_cid_or_callsign('controllers', cid, callsign, update_mode)
 
-    def controllers(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsign? same as pilots above
+    def controllers(self, cids: Optional[int | list[int]] = None, callsigns: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, Controller]:
         return self._return_list_filtered_cid_or_callsign('controllers', cids, callsigns, update_mode)
 
-    def atis(self, callsign, update_mode=UpdateMode.NORMAL): # cid will not be unique here, but callsign will
+    def atis(self, callsign: Optional[str] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | ATIS:
         return self._return_single_exact_match('atis', callsign, update_mode)
 
-    def atises(self, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL): #cid or callsigns
+    def atises(self, cids: Optional[int | list[int]] = None, callsigns: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[str, ATIS]:
         return self._return_list_filtered_cid_or_callsign('atis', cids, callsigns, update_mode)
     
-    def pilot_ratings(self, update_mode=UpdateMode.NORMAL):
+    def pilot_ratings(self, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, PilotRating]:
         return self._return_whole('pilot_ratings', update_mode)
 
-    def pilot_rating(self, id, update_mode=UpdateMode.NORMAL):
+    def pilot_rating(self, id: int, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | PilotRating:
         return self._return_single_exact_match('pilot_ratings', id, update_mode)
 
-    def facilities(self, update_mode=UpdateMode.NORMAL):
+    def facilities(self, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, Facility]:
         return self._return_whole('facilities', update_mode)
 
-    def facility(self, id, update_mode=UpdateMode.NORMAL):
+    def facility(self, id: int, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | Facility:
         return self._return_single_exact_match('facilities', id, update_mode)
 
-    def controller_ratings(self, update_mode=UpdateMode.NORMAL):
+    def controller_ratings(self, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, Rating]:
         return self._return_whole('ratings', update_mode)
 
-    def controller_rating(self, id, update_mode=UpdateMode.NORMAL):
+    def controller_rating(self, id: int, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | Rating:
         return self._return_single_exact_match('ratings', id, update_mode)
 
-    def servers(self, update_mode=UpdateMode.NORMAL):
+    def servers(self, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[str, Server]:
         return self._return_whole('servers', update_mode)
     
-    def server(self, ident_str, update_mode=UpdateMode.NORMAL):
+    def server(self, ident_str: str, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | Server:
         return self._return_single_exact_match('servers', ident_str, update_mode)
     
     # TODO: function that can return all, only active or only prefiled flightplans

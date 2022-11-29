@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pyvatsim"
-version = "0.1.1"
+version = "0.1.2"
 authors = [
   { name="Ken Greim", email="ken.greim+vatsimapi@gmail.com" },
 ]
 description = "Library to access Vatsim live data and APIs"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
