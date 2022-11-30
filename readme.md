@@ -36,7 +36,7 @@ TBD
     * In general, it is best to not rely on the departure time, as they are generally not used on the network
 
 # Possible Todos
-* Add support for Vatsim's rest API, which is separate from the live data
+* Add support for Vatsim's REST API, which is separate from the live data
 * Potentially create utils functions in a separate namespace from the API functions. For example:
     * Pilot's distance from filed departure airport and arrival airport
     * List of all pilots within a GeoJSON-defined boundary
