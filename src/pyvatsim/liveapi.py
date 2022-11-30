@@ -310,6 +310,7 @@ class VatsimLiveAPI():
 
         self._metar_cache = TTLCache(METAR_TTL)
         self._conndata_cache  = TTLCache(DATA_TTL)
+        self._server_last_updated = None
 
     def _fetch_metars(self, fields):
         if isinstance(fields, str):
@@ -333,23 +334,38 @@ class VatsimLiveAPI():
             r = requests.get(self.vatsim_endpoints.data_json_url)
         except Exception as e:
             raise
-            
+        
         json = r.json()
 
+        # Before we do anything, check the timestamp for the last server-side update. If the server-side data hasn't updated, 
+        # we don't need to parse everything (even though the data might be "stale" according to our TTL)
+        server_update_dt = self.parse_timestampstr(json['general']['update_timestamp'])
+        if self._server_last_updated == server_update_dt:
+            return # Don't cache anything here as we don't want to reset our internal TTL
+        
+        # If we have new server-side data, update timestamp and cache raw result with '_ALL' special key
+        self._server_last_updated = server_update_dt
+        self._conndata_cache.cache(json)
+
+        # Fetch configs map the json dict to
+        #   1. class name
+        #   2. class method that takes the json dict and returns an instance of the class
+        #   3. instance variable that will be used as the unique key in the resulting stored dict
+        # 
+        # Ex. for each i in json['facilities'], store f = Facility.from_api_json(i) in new dict with f.id as the key
         # Order matters here. Have to fetch the lookup tables first so that we can join objects properly
         fetch_configs = {
-            'facilities'    : (Facility, 'from_api_json', 'id'),
-            'ratings'       : (Rating, 'from_api_json', 'id'),
-            'pilot_ratings' : (PilotRating, 'from_api_json', 'id'),
-            'servers'       : (Server, 'from_api_json', 'ident'),
-            'pilots'        : (ActivePilot, 'from_api_json', 'cid'),
+            'facilities'    : (Facility,      'from_api_json', 'id'),
+            'ratings'       : (Rating,        'from_api_json', 'id'),
+            'pilot_ratings' : (PilotRating,   'from_api_json', 'id'),
+            'servers'       : (Server,        'from_api_json', 'ident'),
+            'pilots'        : (ActivePilot,   'from_api_json', 'cid'),
             'prefiles'      : (PrefiledPilot, 'from_api_json', 'cid'),
-            'controllers'   : (Controller, 'from_api_json', 'cid'),
-            'atis'          : (ATIS, 'from_api_json', 'callsign')
+            'controllers'   : (Controller,    'from_api_json', 'cid'),
+            'atis'          : (ATIS,          'from_api_json', 'callsign')
         }
 
-        self._conndata_cache.cache(json) # Cache raw result with '_ALL' special key
-
+        # Iterate over fetch configs to parse json into objects and cache
         for name, (obj, constructor, key) in fetch_configs.items():
             result = {}
             for i in json[name]:
