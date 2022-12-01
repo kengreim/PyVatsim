@@ -348,28 +348,27 @@ class VatsimLiveAPI():
         self._conndata_cache.cache(json)
 
         # Fetch configs map the json dict to
-        #   1. class name
-        #   2. class method that takes the json dict and returns an instance of the class
-        #   3. instance variable that will be used as the unique key in the resulting stored dict
+        #   1. class method that takes the json dict and returns an instance of the class
+        #   2. instance variable that will be used as the unique key in the resulting stored dict
         # 
         # Ex. for each i in json['facilities'], store f = Facility.from_api_json(i) in new dict with f.id as the key
         # Order matters here. Have to fetch the lookup tables first so that we can join objects properly
         fetch_configs = {
-            'facilities'    : (Facility,      'from_api_json', 'id'),
-            'ratings'       : (Rating,        'from_api_json', 'id'),
-            'pilot_ratings' : (PilotRating,   'from_api_json', 'id'),
-            'servers'       : (Server,        'from_api_json', 'ident'),
-            'pilots'        : (ActivePilot,   'from_api_json', 'cid'),
-            'prefiles'      : (PrefiledPilot, 'from_api_json', 'cid'),
-            'controllers'   : (Controller,    'from_api_json', 'cid'),
-            'atis'          : (ATIS,          'from_api_json', 'callsign')
+            'facilities'    : (Facility.from_api_json,      'id'),
+            'ratings'       : (Rating.from_api_json,        'id'),
+            'pilot_ratings' : (PilotRating.from_api_json,   'id'),
+            'servers'       : (Server.from_api_json,        'ident'),
+            'pilots'        : (ActivePilot.from_api_json,   'cid'),
+            'prefiles'      : (PrefiledPilot.from_api_json, 'cid'),
+            'controllers'   : (Controller.from_api_json,    'cid'),
+            'atis'          : (ATIS.from_api_json,          'callsign')
         }
 
         # Iterate over fetch configs to parse json into objects and cache
-        for name, (obj, constructor, key) in fetch_configs.items():
+        for name, (constructor, key) in fetch_configs.items():
             result = {}
             for i in json[name]:
-                j = getattr(obj, constructor)(i, self)
+                j = constructor(i, self)
                 result[getattr(j, key)] = j
             self._conndata_cache.cache(result, name)
     
