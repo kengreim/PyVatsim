@@ -1,7 +1,7 @@
 # What is PyVatsim?
 PyVatsim is a Python library to interact with data from Vatsim's live datafeed, currently located at: http://data.vatsim.net/. It implements Python objects to access the underlying Vatsim data in a Pythonic way, and also parses certain data into developer friendly formats (e.g., timestamp strings into Python datetime objects). 
 
-Because Vatsim's datafeed is updated every ~15 seconds, Py-API supports configurable caching of data from the datafeed so that each access method does not fetch the datafeed (although a "force update" override exists if needed).
+Because Vatsim's datafeed is updated every ~15 seconds, PyVatsim supports configurable caching of data from the datafeed so that each access method does not fetch the datafeed (although a "force update" override exists if needed).
 
 # Status
 This project is in alpha state. It currently offers full functionality to access the Vatsim live data (with time-based caching support), but
