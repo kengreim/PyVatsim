@@ -18,12 +18,17 @@ Alternatively, you can use the `pyvatsim` folder or `liveapi.py` as a package or
 
 # How to Develop
 Clone the repo and create a new Python virtual environment using `requirements.txt`, which should look something like:
-```
+```bash
 git clone https://github.com/kengreim/PyVatsim.git
 cd pyvatsim
 python3 -m venv venv
 ./venv/Scripts/activate
 pip install -r requirements.txt
+```
+
+### Testing
+```bash
+pytest
 ```
 
 # Full Documentation
