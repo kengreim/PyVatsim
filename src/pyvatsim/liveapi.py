@@ -42,7 +42,7 @@ class Facility(NameTable):
 class PilotRating(NameTable):
     short_name: str
     long_name: str
-    
+
     @classmethod
     def from_api_json(cls, json_dict: dict, api: Optional[VatsimLiveAPI] = None) -> PilotRating:
         json_dict['short'] = json_dict['short_name']
@@ -91,7 +91,7 @@ class Flightplan:
 
         if json_dict is None:
             return None
-        
+
         args = json_dict
 
         # Vatsim API returns strings for some numeric values, so cast them
@@ -108,11 +108,11 @@ class Flightplan:
 
         # Create datetime for filed departure time
         now = datetime.now(timezone.utc)
-        try: 
+        try:
             # TODO -- still need to clean up the departure time logic
             # Start with naive interpretation that the hours and minutes belong to today
             args['deptime'] = datetime(now.year, now.month, now.day, int(args['deptime'][:2]), int(args['deptime'][2:]), tzinfo=timezone.utc)
-            
+
             # If we find a DOF field in the remarks, that gives us the exact year, time and day. Although this might not always be right...
             # r = re.search(r'DOF/([0-9]{6})', args['remarks'])
             # if r is not None:
@@ -120,7 +120,7 @@ class Flightplan:
             #     d = datetime.strptime(r.group(), '%y%m%d')
             #     print(d)
             #     args['deptime']= args['deptime'].replace(year=d.year, month=d.month, day=d.day)
-            
+
             # if prefile:
             #     # TODO -- need to fix this logic, prefiles could have departure times in the past that shouldn't be updated, need some kind of rollover logic. Maybe check 2 hours from now
             #     if args['deptime'] < now:
@@ -133,7 +133,7 @@ class Flightplan:
         # Create timedeltas to represent filed enroute_time and fuel time
         args['enroute_time'] = timedelta(hours=int(args['enroute_time'][:2]), minutes=int(args['enroute_time'][2:]))
         args['fuel_time'] = timedelta(hours=int(args['fuel_time'][:2]), minutes=int(args['fuel_time'][2:]))
-        
+
         return cls(**args)
 
 @dataclass
@@ -258,7 +258,7 @@ class ATIS(Controller):
         return cls(**args)
 
 
-class TTLCache():
+class TTLCache:
     def __init__(self, ttl):
         self.ttl = ttl
         self._cache = {}
@@ -270,7 +270,7 @@ class TTLCache():
             return True
         else:
             return self._cache[key] == None or (now - self._last_update_time[key]).total_seconds() > self.ttl
-    
+
     def get_cached(self, key='_ALL'):
         # TODO - should probably add logic checks for stale data here, maybe throw error if attempting to get cached data older than TTL
         return self._cache[key] if key in self._cache else None
@@ -280,7 +280,7 @@ class TTLCache():
         self._last_update_time[key] = datetime.now(timezone.utc)
 
 
-class VatsimEndpoints():
+class VatsimEndpoints:
 
     def __init__(self, status_url: str = STATUS_JSON_URL) -> None:
 
@@ -288,7 +288,7 @@ class VatsimEndpoints():
             r = requests.get(status_url)
         except Exception as e:
             raise
-        
+
         j = r.json()
         self.status_json_url = status_url
         self.data_json_url = j['data']['v3'][0]
@@ -299,7 +299,7 @@ class VatsimEndpoints():
         self.metar_php_url = j['metar'][0]
 
 
-class VatsimLiveAPI():
+class VatsimLiveAPI:
 
     def __init__(self, vatsim_endpoints: VatsimEndpoints = None, DATA_TTL: int = 15, METAR_TTL: int = 60) -> None:
         if vatsim_endpoints is None:
@@ -328,13 +328,13 @@ class VatsimLiveAPI():
             metars[metar.field] = metar
 
         return metars
-    
+
     def _fetch_and_cache_conn_data(self):
         try:
             r = requests.get(self.vatsim_endpoints.data_json_url)
         except Exception as e:
             raise
-        
+
         json = r.json()
 
         # Before we do anything, check the timestamp for the last server-side update. If the server-side data hasn't updated, 
@@ -342,7 +342,7 @@ class VatsimLiveAPI():
         server_update_dt = self.parse_timestampstr(json['general']['update_timestamp'])
         if self._server_last_updated == server_update_dt:
             return # Don't cache anything here as we don't want to reset our internal TTL
-        
+
         # If we have new server-side data, update timestamp and cache raw result with '_ALL' special key
         self._server_last_updated = server_update_dt
         self._conndata_cache.cache(json)
@@ -371,7 +371,7 @@ class VatsimLiveAPI():
                 j = constructor(i, self)
                 result[getattr(j, key)] = j
             self._conndata_cache.cache(result, name)
-    
+
     @staticmethod
     def parse_timestampstr(timestr: str) -> datetime:
         try:
@@ -379,23 +379,23 @@ class VatsimLiveAPI():
             return d.replace(tzinfo=timezone.utc)
         except ValueError as e:
             pass
-        
+
         try:
             d = datetime.strptime(timestr, '%Y-%m-%dT%H:%M:%S.%fZ')
             return d.replace(tzinfo=timezone.utc)
         except ValueError as e:
             pass
-        
+
         try:
             d = datetime.strptime(timestr[:26], '%Y-%m-%dT%H:%M:%S.%f')
             return d.replace(tzinfo=timezone.utc)
         except ValueError as e:
             raise
-            
+
     @staticmethod
     def wrap_if_single(input):
         return [input] if isinstance(input, (str, int)) else input
-    
+
     def _update_metars_if_needed(self, key='_ALL', update_mode=UpdateMode.NORMAL):
         match update_mode:
             case UpdateMode.NOUPDATE:
@@ -407,7 +407,7 @@ class VatsimLiveAPI():
             case UpdateMode.FORCE:
                 new_metars = self._fetch_metars('all')
                 self._metar_cache.cache(new_metars)
-    
+
     def metars(self, fields: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[str, Metar]:
         self._update_metars_if_needed(update_mode=update_mode)
         if fields is None:
@@ -431,11 +431,11 @@ class VatsimLiveAPI():
                     self._fetch_and_cache_conn_data()
             case UpdateMode.FORCE:
                 self._fetch_and_cache_conn_data()
-            
+
     def _return_whole(self, cache_key, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
         return self._conndata_cache.get_cached(cache_key)
-    
+
     def _return_filtered(self, cache_key, filter_func, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
         r = {}
@@ -443,7 +443,7 @@ class VatsimLiveAPI():
             if filter_func(v):
                 r[k] = v
         return r if len(r.keys()) > 0 else None
-    
+
     def _return_list_filtered_cid_or_callsign(self, cache_key, cids=None, callsigns=None, update_mode=UpdateMode.NORMAL):
         if cids is not None:
             def filter(v):
@@ -455,7 +455,7 @@ class VatsimLiveAPI():
             return self._return_filtered(cache_key, filter, update_mode)
         else:
             return self._return_whole(cache_key, update_mode)
-    
+
     def _return_single_filtered_cid_or_callsign(self, cache_key, cid=None, callsign=None, update_mode=UpdateMode.NORMAL):
         if cid is not None:
             return self._return_single_exact_match(cache_key, cid, update_mode)
@@ -466,7 +466,7 @@ class VatsimLiveAPI():
             return f[list(f.keys())[0]] if f is not None else None
         else:
             return None
-    
+
     def _return_single_exact_match(self, cache_key, val_key, update_mode):
         self._update_conndata_if_needed(update_mode=update_mode)
         r = self._conndata_cache.get_cached(cache_key)
@@ -495,7 +495,7 @@ class VatsimLiveAPI():
 
     def atises(self, cids: Optional[int | list[int]] = None, callsigns: Optional[str | list[str]] = None, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[str, ATIS]:
         return self._return_list_filtered_cid_or_callsign('atis', cids, callsigns, update_mode)
-    
+
     def pilot_ratings(self, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[int, PilotRating]:
         return self._return_whole('pilot_ratings', update_mode)
 
@@ -516,10 +516,10 @@ class VatsimLiveAPI():
 
     def servers(self, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | dict[str, Server]:
         return self._return_whole('servers', update_mode)
-    
+
     def server(self, ident_str: str, update_mode: UpdateMode = UpdateMode.NORMAL) -> None | Server:
         return self._return_single_exact_match('servers', ident_str, update_mode)
-    
+
     # TODO: function that can return all, only active or only prefiled flightplans
     # def flight_plans(self):
     #     pass
