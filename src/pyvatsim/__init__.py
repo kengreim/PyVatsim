@@ -1,1 +1,3 @@
-from .liveapi import UpdateMode, Facility, Server, Rating, PilotRating, Flightplan, ActivePilot, PrefiledPilot, Controller, Metar, ATIS, VatsimEndpoints, VatsimLiveAPI
+from .liveapi import (ATIS, ActivePilot, Controller, Facility, Flightplan,
+                      Metar, PilotRating, PrefiledPilot, Rating, Server,
+                      UpdateMode, VatsimEndpoints, VatsimLiveAPI)
