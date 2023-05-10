@@ -49,6 +49,10 @@ class PilotRating(NameTable):
         json_dict['long'] = json_dict['long_name']
         return cls(**json_dict)
 
+@dataclass
+class MilitaryRating(PilotRating):
+    pass
+
 
 @dataclass
 class Server:
@@ -159,6 +163,7 @@ class ActivePilot:
     callsign: str
     server: Server
     pilot_rating: PilotRating
+    military_rating: MilitaryRating
     latitude: float
     longitude: float
     altitude: int
@@ -354,14 +359,15 @@ class VatsimLiveAPI:
         # Ex. for each i in json['facilities'], store f = Facility.from_api_json(i) in new dict with f.id as the key
         # Order matters here. Have to fetch the lookup tables first so that we can join objects properly
         fetch_configs = {
-            'facilities'    : (Facility.from_api_json,      'id'),
-            'ratings'       : (Rating.from_api_json,        'id'),
-            'pilot_ratings' : (PilotRating.from_api_json,   'id'),
-            'servers'       : (Server.from_api_json,        'ident'),
-            'pilots'        : (ActivePilot.from_api_json,   'cid'),
-            'prefiles'      : (PrefiledPilot.from_api_json, 'cid'),
-            'controllers'   : (Controller.from_api_json,    'cid'),
-            'atis'          : (ATIS.from_api_json,          'callsign')
+            'facilities'       : (Facility.from_api_json,         'id'),
+            'ratings'          : (Rating.from_api_json,           'id'),
+            'pilot_ratings'    : (PilotRating.from_api_json,      'id'),
+            'military_ratings' : (MilitaryRating.from_api_json,   'id'),
+            'servers'          : (Server.from_api_json,           'ident'),
+            'pilots'           : (ActivePilot.from_api_json,      'cid'),
+            'prefiles'         : (PrefiledPilot.from_api_json,    'cid'),
+            'controllers'      : (Controller.from_api_json,       'cid'),
+            'atis'             : (ATIS.from_api_json,             'callsign')
         }
 
         # Iterate over fetch configs to parse json into objects and cache
