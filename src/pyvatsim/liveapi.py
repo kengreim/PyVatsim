@@ -8,6 +8,10 @@ from enum import Enum
 from typing import Optional
 
 
+class CacheOlderThanTTL(Exception):
+    pass
+
+
 # Constants
 STATUS_JSON_URL = 'https://status.vatsim.net/status.json'
 
@@ -56,6 +60,9 @@ class MilitaryRating(PilotRating):
 
 @dataclass
 class Server:
+    """
+    Dataclass for VATSIM FSD Server details
+    """
     ident: str
     hostname_or_ip: str
     location: str
@@ -73,6 +80,9 @@ class Server:
 
 @dataclass
 class Flightplan:
+    """
+    Dataclass for flight plans filed on the VATSIM network
+    """
     flight_rules: str
     aircraft: str
     aircraft_faa: str
@@ -142,6 +152,9 @@ class Flightplan:
 
 @dataclass
 class PrefiledPilot:
+    """
+    Dataclass for describing a pilot with a filed flight plan
+    """
     cid: int
     name: str
     callsign: str
@@ -158,6 +171,9 @@ class PrefiledPilot:
 
 @dataclass
 class ActivePilot:
+    """
+    Dataclass for a pilot who is actively on the network
+    """
     cid: int
     name: str
     callsign: str
@@ -192,6 +208,9 @@ class ActivePilot:
 
 @dataclass
 class Metar:
+    """
+    Dataclass for storing METARs
+    """
     field: str
     time: datetime
     condition: str
@@ -221,6 +240,9 @@ class Metar:
 
 @dataclass
 class Controller:
+    """
+    Dataclass for defining an active Air Traffic Controller
+    """
     cid: int
     name: str
     callsign: str
@@ -248,6 +270,9 @@ class Controller:
 
 @dataclass
 class ATIS(Controller):
+    """
+    Dataclass for defining a controller's ATIS connection
+    """
     atis_code: str
 
     @classmethod
@@ -278,6 +303,10 @@ class TTLCache:
 
     def get_cached(self, key='_ALL'):
         # TODO - should probably add logic checks for stale data here, maybe throw error if attempting to get cached data older than TTL
+        now = datetime.now(timezone.utc)
+        diff = (now - self._last_update_time[key]).total_seconds()
+        if diff > ttl:
+            raise CacheOlderThanTTL("Cached data has expired")
         return self._cache[key] if key in self._cache else None
 
     def cache(self, val, key='_ALL'):
